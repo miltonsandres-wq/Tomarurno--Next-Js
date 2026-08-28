@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Megaphone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { textoAnuncioTurno, ColaAnuncios } from "@/lib/tts";
+import { estiloTurno } from "@/lib/estilos-turno";
 import type { Database } from "@/lib/types/database";
 
 type TurnoPublico = Database["public"]["Views"]["v_turnos_publicos"]["Row"];
@@ -16,10 +17,10 @@ const EXTENSIONES_VIDEO = [".mp4", ".webm", ".mov", ".ogg"];
 const esVideo = (url: string) => EXTENSIONES_VIDEO.some((ext) => url.toLowerCase().includes(ext));
 
 const MAX_HISTORIAL = 6;
+const MAX_AUSENTES = 4;
 const RECONEXION_MS = 3000;
 const ROTACION_ANUNCIO_MS = 8000;
 const ESTADOS_ACTIVOS: EstadoTurno[] = ["LLAMANDO", "EN_ATENCION"];
-const ESTADOS_HISTORIAL: EstadoTurno[] = ["FINALIZADO", "AUSENTE"];
 
 const AZUL = "#0b3d91";
 const DORADO = "#c8a13a";
@@ -109,6 +110,7 @@ export function DisplayClient({
   activosIniciales,
   colaInicial,
   historialInicial,
+  ausentesInicial,
   ventanillasIniciales,
   ventanillasPorServicio,
   anuncios,
@@ -119,6 +121,7 @@ export function DisplayClient({
   activosIniciales: TurnoPublico[];
   colaInicial: TurnoPublico[];
   historialInicial: TurnoPublico[];
+  ausentesInicial: TurnoPublico[];
   ventanillasIniciales: { id: string; nombre: string }[];
   ventanillasPorServicio: Record<string, string[]>;
   anuncios: Anuncio[];
@@ -131,6 +134,7 @@ export function DisplayClient({
     new Map(colaInicial.map((t) => [t.id as string, t])),
   );
   const [historial, setHistorial] = useState<TurnoPublico[]>(historialInicial);
+  const [ausentes, setAusentes] = useState<TurnoPublico[]>(ausentesInicial);
   const [hora, setHora] = useState<Date | null>(null);
   const [conectado, setConectado] = useState(true);
 
@@ -160,29 +164,39 @@ export function DisplayClient({
     let disposed = false;
 
     async function resync() {
-      const [{ data: activosData }, { data: colaData }, { data: historialData }] = await Promise.all([
-        supabase.from("v_turnos_publicos").select("*").eq("sucursal_id", sucursalId).in("estado", ESTADOS_ACTIVOS),
-        supabase
-          .from("v_turnos_publicos")
-          .select("*")
-          .eq("sucursal_id", sucursalId)
-          .eq("estado", "ESPERANDO")
-          .order("created_at", { ascending: true }),
-        supabase
-          .from("v_turnos_publicos")
-          .select("*")
-          .eq("sucursal_id", sucursalId)
-          .in("estado", ESTADOS_HISTORIAL)
-          .not("llamado_at", "is", null)
-          .order("llamado_at", { ascending: false })
-          .limit(MAX_HISTORIAL),
-      ]);
+      const [{ data: activosData }, { data: colaData }, { data: historialData }, { data: ausentesData }] =
+        await Promise.all([
+          supabase.from("v_turnos_publicos").select("*").eq("sucursal_id", sucursalId).in("estado", ESTADOS_ACTIVOS),
+          supabase
+            .from("v_turnos_publicos")
+            .select("*")
+            .eq("sucursal_id", sucursalId)
+            .eq("estado", "ESPERANDO")
+            .order("created_at", { ascending: true }),
+          supabase
+            .from("v_turnos_publicos")
+            .select("*")
+            .eq("sucursal_id", sucursalId)
+            .eq("estado", "FINALIZADO")
+            .not("llamado_at", "is", null)
+            .order("llamado_at", { ascending: false })
+            .limit(MAX_HISTORIAL),
+          supabase
+            .from("v_turnos_publicos")
+            .select("*")
+            .eq("sucursal_id", sucursalId)
+            .eq("estado", "AUSENTE")
+            .not("llamado_at", "is", null)
+            .order("llamado_at", { ascending: false })
+            .limit(MAX_AUSENTES),
+        ]);
       if (disposed) return;
       if (activosData) {
         setActivos(new Map(activosData.filter((t) => t.ventanilla_id).map((t) => [t.ventanilla_id as string, t])));
       }
       if (colaData) setCola(new Map(colaData.map((t) => [t.id as string, t])));
       if (historialData) setHistorial(historialData);
+      if (ausentesData) setAusentes(ausentesData);
     }
 
     function procesarFila(row: TurnoRow) {
@@ -200,9 +214,13 @@ export function DisplayClient({
         return siguiente;
       });
 
-      if (!row.ventanilla_id) return;
-
       const fila = filaDesdeRealtime(row, nombresVentanillaRef.current);
+
+      if (row.estado === "AUSENTE") {
+        setAusentes((prev) => [fila, ...prev.filter((t) => t.id !== fila.id)].slice(0, MAX_AUSENTES));
+      }
+
+      if (!row.ventanilla_id) return;
 
       if (ESTADOS_ACTIVOS.includes(row.estado)) {
         setActivos((prev) => new Map(prev).set(row.ventanilla_id as string, fila));
@@ -213,7 +231,7 @@ export function DisplayClient({
           siguiente.delete(row.ventanilla_id as string);
           return siguiente;
         });
-        if (ESTADOS_HISTORIAL.includes(row.estado)) {
+        if (row.estado === "FINALIZADO") {
           setHistorial((prev) => [fila, ...prev.filter((t) => t.id !== fila.id)].slice(0, MAX_HISTORIAL));
         }
       }
@@ -353,7 +371,7 @@ export function DisplayClient({
               <div className="overflow-hidden rounded-lg bg-white shadow-sm divide-y divide-slate-100">
                 <AnimatePresence initial={false}>
                   {colaLista.map((t) => {
-                    const urgente = t.prioridad === "URGENTE";
+                    const estilo = estiloTurno(t);
                     const ventanillasDestino = ventanillasPorServicio[t.servicio_id ?? ""] ?? [];
                     return (
                       <motion.div
@@ -363,17 +381,19 @@ export function DisplayClient({
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 8 }}
                         transition={{ duration: 0.25 }}
-                        className={`flex h-16 flex-col items-start justify-center px-4 ${
-                          urgente ? "bg-red-50" : "odd:bg-slate-50/60"
-                        }`}
+                        className={`flex h-16 flex-col items-start justify-center px-4 ${estilo.fila}`}
                       >
-                        <span
-                          className={`text-2xl font-bold tabular-nums ${urgente ? "text-red-600" : ""}`}
-                          style={urgente ? undefined : { color: AZUL }}
-                        >
-                          {t.codigo_ticket}
-                        </span>
-                        <span className="text-xs font-medium text-slate-500">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-2xl tabular-nums ${estilo.codigo}`}>{t.codigo_ticket}</span>
+                          {estilo.etiqueta && (
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${estilo.etiquetaClase}`}
+                            >
+                              {estilo.etiqueta}
+                            </span>
+                          )}
+                        </div>
+                        <span className={`text-xs font-medium ${estilo.texto}`}>
                           {ventanillasDestino.length > 0
                             ? `→ ${ventanillasDestino.map((v: string) => `Ventanilla ${v}`).join(" · ")}`
                             : "Sin ventanilla asignada"}
@@ -391,24 +411,54 @@ export function DisplayClient({
               <p className="mb-1 text-xs font-medium text-slate-400">Últimos llamados</p>
               <div className="overflow-hidden rounded-lg bg-white shadow-sm divide-y divide-slate-100">
                 <AnimatePresence initial={false}>
-                  {historial.map((t) => (
-                    <motion.div
-                      key={t.id}
-                      layout
-                      initial={{ opacity: 0, y: -8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 8 }}
-                      transition={{ duration: 0.25 }}
-                      className="flex h-16 flex-col items-start justify-center px-4 odd:bg-slate-50/60"
-                    >
-                      <span className="text-2xl font-bold tabular-nums" style={{ color: AZUL }}>
-                        {t.codigo_ticket}
-                      </span>
-                      <span className="text-xs font-medium text-slate-500">
-                        Ventanilla {t.ventanilla_nombre ?? "—"}
-                      </span>
-                    </motion.div>
-                  ))}
+                  {historial.map((t) => {
+                    const estilo = estiloTurno(t);
+                    return (
+                      <motion.div
+                        key={t.id}
+                        layout
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 8 }}
+                        transition={{ duration: 0.25 }}
+                        className={`flex h-16 flex-col items-start justify-center px-4 ${estilo.fila}`}
+                      >
+                        <span className={`text-2xl tabular-nums ${estilo.codigo}`}>{t.codigo_ticket}</span>
+                        <span className={`text-xs font-medium ${estilo.texto}`}>
+                          Ventanilla {t.ventanilla_nombre ?? "—"}
+                        </span>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
+            </div>
+          )}
+
+          {ausentes.length > 0 && (
+            <div className="w-full max-w-md">
+              <p className="mb-1 text-xs font-medium text-slate-400">Ausentes</p>
+              <div className="overflow-hidden rounded-lg bg-white shadow-sm divide-y divide-slate-100">
+                <AnimatePresence initial={false}>
+                  {ausentes.map((t) => {
+                    const estilo = estiloTurno(t);
+                    return (
+                      <motion.div
+                        key={t.id}
+                        layout
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 8 }}
+                        transition={{ duration: 0.25 }}
+                        className={`flex h-10 flex-col items-start justify-center px-4 ${estilo.fila}`}
+                      >
+                        <span className={`text-base tabular-nums ${estilo.codigo}`}>{t.codigo_ticket}</span>
+                        <span className={`text-[11px] font-medium ${estilo.texto}`}>
+                          Ventanilla {t.ventanilla_nombre ?? "—"}
+                        </span>
+                      </motion.div>
+                    );
+                  })}
                 </AnimatePresence>
               </div>
             </div>

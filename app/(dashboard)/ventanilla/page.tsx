@@ -72,6 +72,18 @@ export default async function VentanillaPage({
         .in("servicio_id", servicioIds)
     : { data: [] };
 
+  const { data: ausentes } = perfil.sucursal_id && servicioIds.length > 0
+    ? await supabase
+        .from("turnos")
+        .select("*")
+        .eq("sucursal_id", perfil.sucursal_id)
+        .eq("estado", "AUSENTE")
+        .in("servicio_id", servicioIds)
+        .not("llamado_at", "is", null)
+        .order("llamado_at", { ascending: false })
+        .limit(6)
+    : { data: [] };
+
   return (
     <div>
       {ventanillas.length > 1 && (
@@ -87,6 +99,7 @@ export default async function VentanillaPage({
         servicios={servicios}
         turnoInicial={turnoActual ?? null}
         colaInicial={cola ?? []}
+        ausentesInicial={ausentes ?? []}
         pausaActivaInicial={pausaActiva ?? null}
         limitePausaMinutos={Number(configuracion?.valor ?? 15)}
       />

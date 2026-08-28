@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { estiloTurno } from "@/lib/estilos-turno";
 import type { Database } from "@/lib/types/database";
 import {
   finalizarTurno,
@@ -38,6 +39,7 @@ export function VentanillaClient({
   servicios,
   turnoInicial,
   colaInicial,
+  ausentesInicial,
   pausaActivaInicial,
   limitePausaMinutos,
 }: {
@@ -48,11 +50,13 @@ export function VentanillaClient({
   servicios: Servicio[];
   turnoInicial: TurnoRow | null;
   colaInicial: TurnoRow[];
+  ausentesInicial: TurnoRow[];
   pausaActivaInicial: Pausa | null;
   limitePausaMinutos: number;
 }) {
   const [turnoActual, setTurnoActual] = useState<TurnoRow | null>(turnoInicial);
   const [cola, setCola] = useState<TurnoRow[]>(colaInicial);
+  const [ausentes, setAusentes] = useState<TurnoRow[]>(ausentesInicial);
   const [pausaActiva, setPausaActiva] = useState<Pausa | null>(pausaActivaInicial);
   const [motivoPausa, setMotivoPausa] = useState(MOTIVOS_PAUSA[0]);
   const [conectado, setConectado] = useState(true);
@@ -75,7 +79,7 @@ export function VentanillaClient({
     let disposed = false;
 
     async function resync() {
-      const [{ data: actual }, { data: colaData }] = await Promise.all([
+      const [{ data: actual }, { data: colaData }, { data: ausentesData }] = await Promise.all([
         supabase
           .from("turnos")
           .select("*")
@@ -86,10 +90,19 @@ export function VentanillaClient({
           .limit(1)
           .maybeSingle(),
         supabase.from("turnos").select("*").eq("sucursal_id", sucursalId).eq("estado", "ESPERANDO"),
+        supabase
+          .from("turnos")
+          .select("*")
+          .eq("sucursal_id", sucursalId)
+          .eq("estado", "AUSENTE")
+          .not("llamado_at", "is", null)
+          .order("llamado_at", { ascending: false })
+          .limit(20),
       ]);
       if (disposed) return;
       setTurnoActual(actual ?? null);
       if (colaData) setCola(colaData.filter((t) => servicioIds.has(t.servicio_id)));
+      if (ausentesData) setAusentes(ausentesData.filter((t) => servicioIds.has(t.servicio_id)).slice(0, 6));
     }
 
     function procesarFila(row: TurnoRow) {
@@ -106,6 +119,10 @@ export function VentanillaClient({
           const resto = prev.filter((t) => t.id !== row.id);
           return row.estado === "ESPERANDO" ? [...resto, row] : resto;
         });
+
+        if (row.estado === "AUSENTE") {
+          setAusentes((prev) => [row, ...prev.filter((t) => t.id !== row.id)].slice(0, 6));
+        }
       }
     }
 
@@ -322,18 +339,24 @@ export function VentanillaClient({
                 </div>
                 {turnosServicio.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-1.5">
-                    {turnosServicio.map((t) => (
-                      <span
-                        key={t.id}
-                        className={`rounded-full border px-2.5 py-1 text-xs font-semibold tabular-nums ${
-                          t.prioridad === "URGENTE"
-                            ? "border-destructive/30 bg-destructive/10 text-destructive"
-                            : "border-border bg-muted/50"
-                        }`}
-                      >
-                        {t.codigo_ticket}
-                      </span>
-                    ))}
+                    {turnosServicio.map((t) => {
+                      const estilo = estiloTurno(t);
+                      return (
+                        <span
+                          key={t.id}
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs tabular-nums ${estilo.fila} ${estilo.codigo}`}
+                        >
+                          {t.codigo_ticket}
+                          {estilo.etiqueta && (
+                            <span
+                              className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${estilo.etiquetaClase}`}
+                            >
+                              {estilo.etiqueta}
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="mt-3 text-xs text-muted-foreground">Sin turnos en espera.</p>
@@ -346,6 +369,25 @@ export function VentanillaClient({
           )}
         </div>
       </div>
+
+      {ausentes.length > 0 && (
+        <div>
+          <h2 className="mb-2 text-sm font-medium text-muted-foreground">Ausentes recientes</h2>
+          <div className="flex flex-wrap gap-1.5">
+            {ausentes.map((t) => {
+              const estilo = estiloTurno(t);
+              return (
+                <span
+                  key={t.id}
+                  className={`rounded-full px-2.5 py-1 text-xs tabular-nums ${estilo.fila} ${estilo.codigo}`}
+                >
+                  {t.codigo_ticket}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

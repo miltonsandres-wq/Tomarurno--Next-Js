@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { DisplayClient } from "./display-client";
 
 const HISTORIAL_TOTAL = 6;
+const AUSENTES_TOTAL = 4;
 
 export default async function DisplayPage({
   params,
@@ -30,6 +31,7 @@ export default async function DisplayPage({
     { data: activos },
     { data: cola },
     { data: historial },
+    { data: ausentes },
     { data: ventanillas },
     { data: anuncios },
     { data: config },
@@ -50,10 +52,18 @@ export default async function DisplayPage({
         .from("v_turnos_publicos")
         .select("*")
         .eq("sucursal_id", sucursalRow.id)
-        .in("estado", ["FINALIZADO", "AUSENTE"])
+        .eq("estado", "FINALIZADO")
         .not("llamado_at", "is", null)
         .order("llamado_at", { ascending: false })
         .limit(HISTORIAL_TOTAL),
+      supabase
+        .from("v_turnos_publicos")
+        .select("*")
+        .eq("sucursal_id", sucursalRow.id)
+        .eq("estado", "AUSENTE")
+        .not("llamado_at", "is", null)
+        .order("llamado_at", { ascending: false })
+        .limit(AUSENTES_TOTAL),
       supabase.from("ventanillas").select("id, nombre").eq("sucursal_id", sucursalRow.id),
       supabase
         .from("anuncios")
@@ -88,6 +98,7 @@ export default async function DisplayPage({
       activosIniciales={activos ?? []}
       colaInicial={cola ?? []}
       historialInicial={historial ?? []}
+      ausentesInicial={ausentes ?? []}
       ventanillasIniciales={ventanillas ?? []}
       ventanillasPorServicio={ventanillasPorServicio}
       anuncios={anuncios ?? []}
