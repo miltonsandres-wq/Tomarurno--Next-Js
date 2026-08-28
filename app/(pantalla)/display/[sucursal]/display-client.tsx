@@ -346,7 +346,7 @@ export function DisplayClient({
           )}
 
           {colaLista.length > 0 && (
-            <div className="w-full max-w-2xl">
+            <div className="w-full max-w-md">
               <p className="mb-1 text-xs font-medium text-slate-400">
                 En cola ({colaLista.length})
               </p>
@@ -363,7 +363,7 @@ export function DisplayClient({
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 8 }}
                         transition={{ duration: 0.25 }}
-                        className={`flex h-12 items-center justify-between px-4 ${
+                        className={`flex h-16 flex-col items-start justify-center px-4 ${
                           urgente ? "bg-red-50" : "odd:bg-slate-50/60"
                         }`}
                       >
@@ -387,24 +387,24 @@ export function DisplayClient({
           )}
 
           {historial.length > 0 && (
-            <div className="w-full max-w-2xl">
+            <div className="w-full max-w-md">
               <p className="mb-1 text-xs font-medium text-slate-400">Últimos llamados</p>
-              <div className="grid grid-cols-3 gap-2 rounded-lg bg-white p-2 shadow-sm lg:grid-cols-6">
+              <div className="overflow-hidden rounded-lg bg-white shadow-sm divide-y divide-slate-100">
                 <AnimatePresence initial={false}>
                   {historial.map((t) => (
                     <motion.div
                       key={t.id}
                       layout
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 8 }}
                       transition={{ duration: 0.25 }}
-                      className="flex flex-col items-center justify-center gap-0.5 rounded-md bg-slate-50 px-2 py-1.5 text-center"
+                      className="flex h-16 flex-col items-start justify-center px-4 odd:bg-slate-50/60"
                     >
-                      <span className="text-lg font-bold tabular-nums" style={{ color: AZUL }}>
+                      <span className="text-2xl font-bold tabular-nums" style={{ color: AZUL }}>
                         {t.codigo_ticket}
                       </span>
-                      <span className="text-[11px] text-slate-500">
+                      <span className="text-xs font-medium text-slate-500">
                         Ventanilla {t.ventanilla_nombre ?? "—"}
                       </span>
                     </motion.div>
