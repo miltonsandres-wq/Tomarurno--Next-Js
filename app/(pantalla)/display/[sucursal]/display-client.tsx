@@ -374,7 +374,7 @@ export function DisplayClient({
                 <AnimatePresence initial={false}>
                   {colaLista.map((t) => {
                     const urgente = t.prioridad === "URGENTE";
-                    const ventanillasDestino = ventanillasPorServicio[t.servicio_id] ?? [];
+                    const ventanillasDestino = ventanillasPorServicio[t.servicio_id ?? ""] ?? [];
                     return (
                       <motion.div
                         key={t.id}
@@ -395,7 +395,7 @@ export function DisplayClient({
                         </span>
                         <span className="text-sm font-medium text-slate-500">
                           {ventanillasDestino.length > 0
-                            ? `→ ${ventanillasDestino.map((v) => `Ventanilla ${v}`).join(" · ")}`
+                            ? `→ ${ventanillasDestino.map((v: string) => `Ventanilla ${v}`).join(" · ")}`
                             : "Sin ventanilla asignada"}
                         </span>
                       </motion.div>
