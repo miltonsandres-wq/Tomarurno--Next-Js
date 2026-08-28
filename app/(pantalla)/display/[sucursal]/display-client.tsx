@@ -319,7 +319,7 @@ export function DisplayClient({
           {activosLista.length === 0 ? (
             <p className="text-3xl text-slate-400">Esperando el próximo llamado</p>
           ) : (
-            <div className="flex w-full max-w-2xl flex-col gap-2">
+            <div className="w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-sm divide-y divide-slate-100">
               <AnimatePresence>
                 {activosLista.map((t) => {
                   const llamando = t.estado === "LLAMANDO";
@@ -331,21 +331,13 @@ export function DisplayClient({
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 16 }}
                       transition={{ duration: 0.35 }}
-                      className={`flex flex-col items-center justify-center overflow-hidden rounded-xl px-4 py-3 text-center shadow ${
-                        llamando ? "" : "border"
-                      }`}
-                      style={
-                        llamando
-                          ? { backgroundColor: DORADO, color: "#ffffff" }
-                          : { backgroundColor: "#ffffff", color: AZUL, borderColor: "#e2e8f0" }
-                      }
+                      className="flex h-14 items-center justify-between px-5"
+                      style={llamando ? { backgroundColor: DORADO, color: "#ffffff" } : { color: AZUL }}
                     >
-                      <p className={`font-bold tabular-nums ${llamando ? "text-4xl" : "text-2xl"}`}>
-                        {t.codigo_ticket}
-                      </p>
-                      <p className={`mt-1 font-medium ${llamando ? "text-base" : "text-sm opacity-80"}`}>
+                      <span className="text-2xl font-bold tabular-nums">{t.codigo_ticket}</span>
+                      <span className={`font-medium ${llamando ? "text-base" : "text-sm opacity-70"}`}>
                         Ventanilla {t.ventanilla_nombre ?? "—"}
-                      </p>
+                      </span>
                     </motion.div>
                   );
                 })}
@@ -358,7 +350,7 @@ export function DisplayClient({
               <p className="mb-1 text-xs font-medium text-slate-400">
                 En cola ({colaLista.length})
               </p>
-              <div className="flex flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm">
+              <div className="overflow-hidden rounded-lg bg-white shadow-sm divide-y divide-slate-100">
                 <AnimatePresence initial={false}>
                   {colaLista.map((t) => {
                     const urgente = t.prioridad === "URGENTE";
@@ -371,12 +363,12 @@ export function DisplayClient({
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 8 }}
                         transition={{ duration: 0.25 }}
-                        className={`flex items-center justify-between rounded-md border px-3 py-1.5 ${
-                          urgente ? "border-red-200 bg-red-50" : "border-slate-100 bg-slate-50"
+                        className={`flex h-12 items-center justify-between px-4 ${
+                          urgente ? "bg-red-50" : "odd:bg-slate-50/60"
                         }`}
                       >
                         <span
-                          className={`text-base font-bold tabular-nums ${urgente ? "text-red-600" : ""}`}
+                          className={`text-2xl font-bold tabular-nums ${urgente ? "text-red-600" : ""}`}
                           style={urgente ? undefined : { color: AZUL }}
                         >
                           {t.codigo_ticket}
