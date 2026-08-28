@@ -301,14 +301,43 @@ export function VentanillaClient({
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {servicios.map((s) => {
             const c = conteoServicio.get(s.id) ?? { total: 0, preferencial: 0, urgente: 0 };
+            const turnosServicio = cola
+              .filter((t) => t.servicio_id === s.id)
+              .sort((a, b) => {
+                if (a.prioridad !== b.prioridad) {
+                  if (a.prioridad === "URGENTE") return -1;
+                  if (b.prioridad === "URGENTE") return 1;
+                }
+                return a.created_at.localeCompare(b.created_at);
+              });
             return (
               <div key={s.id} className="rounded-lg border p-4">
-                <p className="font-medium">{s.nombre}</p>
-                <p className="text-2xl font-semibold">{c.total}</p>
+                <div className="flex items-baseline justify-between">
+                  <p className="font-medium">{s.nombre}</p>
+                  <p className="text-2xl font-semibold">{c.total}</p>
+                </div>
                 <div className="mt-1 flex gap-2 text-xs text-muted-foreground">
                   <span>{c.preferencial} preferencial</span>
                   {c.urgente > 0 && <Badge variant="destructive">{c.urgente} urgente</Badge>}
                 </div>
+                {turnosServicio.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {turnosServicio.map((t) => (
+                      <span
+                        key={t.id}
+                        className={`rounded-full border px-2.5 py-1 text-xs font-semibold tabular-nums ${
+                          t.prioridad === "URGENTE"
+                            ? "border-destructive/30 bg-destructive/10 text-destructive"
+                            : "border-border bg-muted/50"
+                        }`}
+                      >
+                        {t.codigo_ticket}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs text-muted-foreground">Sin turnos en espera.</p>
+                )}
               </div>
             );
           })}

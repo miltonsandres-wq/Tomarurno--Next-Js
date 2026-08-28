@@ -107,6 +107,7 @@ export function DisplayClient({
   sucursalId,
   sucursalNombre,
   activosIniciales,
+  colaInicial,
   historialInicial,
   ventanillasIniciales,
   anuncios,
@@ -115,6 +116,7 @@ export function DisplayClient({
   sucursalId: string;
   sucursalNombre: string;
   activosIniciales: TurnoPublico[];
+  colaInicial: TurnoPublico[];
   historialInicial: TurnoPublico[];
   ventanillasIniciales: { id: string; nombre: string }[];
   anuncios: Anuncio[];
@@ -122,6 +124,9 @@ export function DisplayClient({
 }) {
   const [activos, setActivos] = useState<Map<string, TurnoPublico>>(
     new Map(activosIniciales.filter((t) => t.ventanilla_id).map((t) => [t.ventanilla_id as string, t])),
+  );
+  const [cola, setCola] = useState<Map<string, TurnoPublico>>(
+    new Map(colaInicial.map((t) => [t.id as string, t])),
   );
   const [historial, setHistorial] = useState<TurnoPublico[]>(historialInicial);
   const [hora, setHora] = useState<Date | null>(null);
@@ -153,8 +158,14 @@ export function DisplayClient({
     let disposed = false;
 
     async function resync() {
-      const [{ data: activosData }, { data: historialData }] = await Promise.all([
+      const [{ data: activosData }, { data: colaData }, { data: historialData }] = await Promise.all([
         supabase.from("v_turnos_publicos").select("*").eq("sucursal_id", sucursalId).in("estado", ESTADOS_ACTIVOS),
+        supabase
+          .from("v_turnos_publicos")
+          .select("*")
+          .eq("sucursal_id", sucursalId)
+          .eq("estado", "ESPERANDO")
+          .order("created_at", { ascending: true }),
         supabase
           .from("v_turnos_publicos")
           .select("*")
@@ -168,11 +179,26 @@ export function DisplayClient({
       if (activosData) {
         setActivos(new Map(activosData.filter((t) => t.ventanilla_id).map((t) => [t.ventanilla_id as string, t])));
       }
+      if (colaData) setCola(new Map(colaData.map((t) => [t.id as string, t])));
       if (historialData) setHistorial(historialData);
     }
 
     function procesarFila(row: TurnoRow) {
-      if (row.estado === "ESPERANDO" || !row.ventanilla_id) return;
+      if (!row.id) return;
+
+      // La cola pública (ESPERANDO) se mantiene aparte de los llamados.
+      if (row.estado === "ESPERANDO") {
+        setCola((prev) => new Map(prev).set(row.id, filaDesdeRealtime(row, nombresVentanillaRef.current)));
+        return;
+      }
+      setCola((prev) => {
+        if (!prev.has(row.id)) return prev;
+        const siguiente = new Map(prev);
+        siguiente.delete(row.id);
+        return siguiente;
+      });
+
+      if (!row.ventanilla_id) return;
 
       const fila = filaDesdeRealtime(row, nombresVentanillaRef.current);
 
@@ -257,6 +283,16 @@ export function DisplayClient({
     return fechaB.localeCompare(fechaA);
   });
 
+  const colaLista = Array.from(cola.values()).sort((a, b) => {
+    // Urgentes primero; dentro de cada grupo, el más antiguo (próximo a
+    // llamar) primero.
+    if (a.prioridad !== b.prioridad) {
+      if (a.prioridad === "URGENTE") return -1;
+      if (b.prioridad === "URGENTE") return 1;
+    }
+    return (a.created_at ?? "").localeCompare(b.created_at ?? "");
+  });
+
   return (
     <div className="flex min-h-screen flex-col bg-[#f4f5f7]">
       <header
@@ -324,6 +360,37 @@ export function DisplayClient({
                   );
                 })}
               </AnimatePresence>
+            </div>
+          )}
+
+          {colaLista.length > 0 && (
+            <div className="w-full max-w-6xl">
+              <p className="mb-2 text-sm font-medium text-slate-400">
+                En cola ({colaLista.length})
+              </p>
+              <div className="flex flex-wrap gap-3 rounded-xl bg-white p-5 shadow-sm">
+                <AnimatePresence initial={false}>
+                  {colaLista.map((t) => {
+                    const urgente = t.prioridad === "URGENTE";
+                    return (
+                      <motion.span
+                        key={t.id}
+                        layout
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        transition={{ duration: 0.25 }}
+                        className={`rounded-full border px-5 py-2 text-xl font-bold tabular-nums ${
+                          urgente ? "border-red-300 bg-red-50 text-red-600" : "border-slate-200 bg-slate-50"
+                        }`}
+                        style={urgente ? undefined : { color: AZUL }}
+                      >
+                        {t.codigo_ticket}
+                      </motion.span>
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
             </div>
           )}
 

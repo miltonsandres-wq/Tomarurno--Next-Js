@@ -26,13 +26,19 @@ export default async function DisplayPage({
     );
   }
 
-  const [{ data: activos }, { data: historial }, { data: ventanillas }, { data: anuncios }, { data: config }] =
+  const [{ data: activos }, { data: cola }, { data: historial }, { data: ventanillas }, { data: anuncios }, { data: config }] =
     await Promise.all([
       supabase
         .from("v_turnos_publicos")
         .select("*")
         .eq("sucursal_id", sucursalRow.id)
         .in("estado", ["LLAMANDO", "EN_ATENCION"]),
+      supabase
+        .from("v_turnos_publicos")
+        .select("*")
+        .eq("sucursal_id", sucursalRow.id)
+        .eq("estado", "ESPERANDO")
+        .order("created_at", { ascending: true }),
       supabase
         .from("v_turnos_publicos")
         .select("*")
@@ -61,6 +67,7 @@ export default async function DisplayPage({
       sucursalId={sucursalRow.id}
       sucursalNombre={sucursalRow.nombre}
       activosIniciales={activos ?? []}
+      colaInicial={cola ?? []}
       historialInicial={historial ?? []}
       ventanillasIniciales={ventanillas ?? []}
       anuncios={anuncios ?? []}
