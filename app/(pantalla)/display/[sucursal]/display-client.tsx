@@ -247,9 +247,15 @@ export function DisplayClient({
     };
   }, [sucursalId]);
 
-  const activosLista = Array.from(activos.values()).sort((a, b) =>
-    (a.ventanilla_nombre ?? "").localeCompare(b.ventanilla_nombre ?? ""),
-  );
+  const activosLista = Array.from(activos.values()).sort((a, b) => {
+    // Los que están siendo llamados ahora van primero; dentro de cada grupo,
+    // el llamado más reciente arriba (efecto "pantalla de banco": lo nuevo
+    // entra arriba y empuja al resto hacia abajo).
+    if (a.estado !== b.estado) return a.estado === "LLAMANDO" ? -1 : 1;
+    const fechaA = a.llamado_at ?? a.created_at ?? "";
+    const fechaB = b.llamado_at ?? b.created_at ?? "";
+    return fechaB.localeCompare(fechaA);
+  });
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f4f5f7]">
@@ -275,26 +281,48 @@ export function DisplayClient({
           {activosLista.length === 0 ? (
             <p className="text-3xl text-slate-400">Esperando el próximo llamado</p>
           ) : (
-            <div className="grid w-full max-w-6xl grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="flex w-full max-w-6xl flex-col gap-3">
+              <div className="flex items-center justify-between px-8 text-sm font-semibold tracking-wide text-slate-400 uppercase">
+                <span>Turno</span>
+                <span>Ventanilla</span>
+              </div>
               <AnimatePresence>
-                {activosLista.map((t) => (
-                  <motion.div
-                    key={t.ventanilla_id}
-                    layout
-                    initial={{ opacity: 0, scale: 0.85 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.85 }}
-                    transition={{ duration: 0.35 }}
-                    className="overflow-hidden rounded-2xl px-8 py-8 text-white shadow-lg"
-                    style={{ backgroundColor: t.estado === "LLAMANDO" ? DORADO : AZUL }}
-                  >
-                    <span className="text-sm font-semibold tracking-wide uppercase opacity-80">
-                      {t.estado === "LLAMANDO" ? "Llamando" : "Atendiendo"}
-                    </span>
-                    <p className="mt-1 text-6xl font-bold tabular-nums">{t.codigo_ticket}</p>
-                    <p className="mt-2 text-lg opacity-90">Ventanilla {t.ventanilla_nombre ?? "—"}</p>
-                  </motion.div>
-                ))}
+                {activosLista.map((t) => {
+                  const llamando = t.estado === "LLAMANDO";
+                  return (
+                    <motion.div
+                      key={t.ventanilla_id}
+                      layout
+                      initial={{ opacity: 0, y: -24 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 24 }}
+                      transition={{ duration: 0.4 }}
+                      className={`flex items-center justify-between overflow-hidden rounded-2xl px-8 shadow-lg ${
+                        llamando ? "py-7" : "py-5 border"
+                      }`}
+                      style={
+                        llamando
+                          ? { backgroundColor: DORADO, color: "#ffffff" }
+                          : { backgroundColor: "#ffffff", color: AZUL, borderColor: "#e2e8f0" }
+                      }
+                    >
+                      <div className="flex items-center gap-6">
+                        <span
+                          className="text-xs font-semibold tracking-widest uppercase opacity-80"
+                          style={{ writingMode: "vertical-rl" }}
+                        >
+                          {llamando ? "Llamando" : "Atendiendo"}
+                        </span>
+                        <p className={`font-bold tabular-nums ${llamando ? "text-7xl" : "text-4xl"}`}>
+                          {t.codigo_ticket}
+                        </p>
+                      </div>
+                      <p className={`font-semibold ${llamando ? "text-3xl" : "text-xl opacity-80"}`}>
+                        Ventanilla {t.ventanilla_nombre ?? "—"}
+                      </p>
+                    </motion.div>
+                  );
+                })}
               </AnimatePresence>
             </div>
           )}
