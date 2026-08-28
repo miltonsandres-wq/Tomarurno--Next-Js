@@ -14,9 +14,12 @@ export function ConfiguracionForm({
 }: {
   valoresIniciales: {
     timeoutAusenteSegundos: number;
+    rellamadoAutomaticoSegundos: number;
     limitePausaMinutos: number;
     ratioPreferencial: number;
     minutosEscalacionUrgente: number;
+    turnosRecientesCantidad: number;
+    destelloLlamadoSegundos: number;
     mensajePantalla: string;
   };
 }) {
@@ -55,6 +58,20 @@ export function ConfiguracionForm({
           />
         </div>
         <div className="space-y-2">
+          <Label htmlFor="rellamado">Re-llamado automático antes de AUSENTE (segundos)</Label>
+          <Input
+            id="rellamado"
+            type="number"
+            min={5}
+            max={590}
+            value={valores.rellamadoAutomaticoSegundos}
+            onChange={(e) => setValores((v) => ({ ...v, rellamadoAutomaticoSegundos: Number(e.target.value) }))}
+          />
+          <p className="text-xs text-muted-foreground">
+            Debe ser menor que el timeout de AUSENTE de arriba.
+          </p>
+        </div>
+        <div className="space-y-2">
           <Label htmlFor="pausa">Límite de pausa/descanso (minutos)</Label>
           <Input
             id="pausa"
@@ -85,6 +102,29 @@ export function ConfiguracionForm({
             max={120}
             value={valores.minutosEscalacionUrgente}
             onChange={(e) => setValores((v) => ({ ...v, minutosEscalacionUrgente: Number(e.target.value) }))}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="recientes">Cuántos últimos llamados mostrar en pantalla</Label>
+          <Input
+            id="recientes"
+            type="number"
+            min={1}
+            max={20}
+            value={valores.turnosRecientesCantidad}
+            onChange={(e) => setValores((v) => ({ ...v, turnosRecientesCantidad: Number(e.target.value) }))}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="destello">Duración del destello al llamar un turno (segundos)</Label>
+          <Input
+            id="destello"
+            type="number"
+            min={3}
+            max={60}
+            value={valores.destelloLlamadoSegundos}
+            onChange={(e) => setValores((v) => ({ ...v, destelloLlamadoSegundos: Number(e.target.value) }))}
           />
         </div>
 

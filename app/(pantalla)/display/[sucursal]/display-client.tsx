@@ -16,7 +16,6 @@ type Anuncio = { id: string; titulo: string | null; imagen_url: string };
 const EXTENSIONES_VIDEO = [".mp4", ".webm", ".mov", ".ogg"];
 const esVideo = (url: string) => EXTENSIONES_VIDEO.some((ext) => url.toLowerCase().includes(ext));
 
-const MAX_HISTORIAL = 6;
 const MAX_AUSENTES = 4;
 const RECONEXION_MS = 3000;
 const ROTACION_ANUNCIO_MS = 8000;
@@ -115,6 +114,8 @@ export function DisplayClient({
   ventanillasPorServicio,
   anuncios,
   mensajePantalla,
+  historialTotal,
+  destelloSegundos,
 }: {
   sucursalId: string;
   sucursalNombre: string;
@@ -126,6 +127,8 @@ export function DisplayClient({
   ventanillasPorServicio: Record<string, string[]>;
   anuncios: Anuncio[];
   mensajePantalla: string;
+  historialTotal: number;
+  destelloSegundos: number;
 }) {
   const [activos, setActivos] = useState<Map<string, TurnoPublico>>(
     new Map(activosIniciales.filter((t) => t.ventanilla_id).map((t) => [t.ventanilla_id as string, t])),
@@ -180,7 +183,7 @@ export function DisplayClient({
             .eq("estado", "FINALIZADO")
             .not("llamado_at", "is", null)
             .order("llamado_at", { ascending: false })
-            .limit(MAX_HISTORIAL),
+            .limit(historialTotal),
           supabase
             .from("v_turnos_publicos")
             .select("*")
@@ -232,7 +235,7 @@ export function DisplayClient({
           return siguiente;
         });
         if (row.estado === "FINALIZADO") {
-          setHistorial((prev) => [fila, ...prev.filter((t) => t.id !== fila.id)].slice(0, MAX_HISTORIAL));
+          setHistorial((prev) => [fila, ...prev.filter((t) => t.id !== fila.id)].slice(0, historialTotal));
         }
       }
 
@@ -291,7 +294,7 @@ export function DisplayClient({
       window.removeEventListener("online", alVolverOnline);
       if (channel) supabase.removeChannel(channel);
     };
-  }, [sucursalId]);
+  }, [sucursalId, historialTotal]);
 
   const activosLista = Array.from(activos.values()).sort((a, b) => {
     // Los que están siendo llamados ahora van primero; dentro de cada grupo,
@@ -341,6 +344,11 @@ export function DisplayClient({
               <AnimatePresence>
                 {activosLista.map((t) => {
                   const llamando = t.estado === "LLAMANDO";
+                  const segundosDesdeLlamado =
+                    llamando && t.llamado_at && hora
+                      ? (hora.getTime() - new Date(t.llamado_at).getTime()) / 1000
+                      : Infinity;
+                  const destello = segundosDesdeLlamado < destelloSegundos;
                   return (
                     <motion.div
                       key={t.ventanilla_id}
@@ -349,7 +357,9 @@ export function DisplayClient({
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 16 }}
                       transition={{ duration: 0.35 }}
-                      className="flex h-14 items-center justify-between px-5"
+                      className={`flex h-14 items-center justify-between px-5 ${
+                        destello ? "animate-pulse ring-4 ring-inset ring-white" : ""
+                      }`}
                       style={llamando ? { backgroundColor: DORADO, color: "#ffffff" } : { color: AZUL }}
                     >
                       <span className="text-2xl font-bold tabular-nums">{t.codigo_ticket}</span>

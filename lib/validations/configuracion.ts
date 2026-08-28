@@ -2,9 +2,12 @@ import { z } from "zod";
 
 export const configuracionSchema = z.object({
   timeoutAusenteSegundos: z.coerce.number().int().min(10).max(600),
+  rellamadoAutomaticoSegundos: z.coerce.number().int().min(5).max(590),
   limitePausaMinutos: z.coerce.number().int().min(1).max(120),
   ratioPreferencial: z.coerce.number().int().min(1).max(10),
   minutosEscalacionUrgente: z.coerce.number().int().min(1).max(120),
+  turnosRecientesCantidad: z.coerce.number().int().min(1).max(20),
+  destelloLlamadoSegundos: z.coerce.number().int().min(3).max(60),
   mensajePantalla: z.string().max(300),
 });
 

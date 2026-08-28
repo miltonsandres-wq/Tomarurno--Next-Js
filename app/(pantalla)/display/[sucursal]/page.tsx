@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { DisplayClient } from "./display-client";
 
-const HISTORIAL_TOTAL = 6;
+const HISTORIAL_TOTAL_DEFAULT = 5;
+const DESTELLO_SEGUNDOS_DEFAULT = 10;
 const AUSENTES_TOTAL = 4;
 
 export default async function DisplayPage({
@@ -27,6 +28,16 @@ export default async function DisplayPage({
     );
   }
 
+  const { data: configRows } = await supabase
+    .from("configuracion")
+    .select("clave, valor")
+    .eq("sucursal_id", sucursalRow.id)
+    .in("clave", ["mensaje_pantalla", "turnos_recientes_cantidad", "destello_llamado_segundos"]);
+
+  const configMapa = new Map((configRows ?? []).map((c) => [c.clave, c.valor]));
+  const historialTotal = Number(configMapa.get("turnos_recientes_cantidad") ?? HISTORIAL_TOTAL_DEFAULT);
+  const destelloSegundos = Number(configMapa.get("destello_llamado_segundos") ?? DESTELLO_SEGUNDOS_DEFAULT);
+
   const [
     { data: activos },
     { data: cola },
@@ -34,7 +45,6 @@ export default async function DisplayPage({
     { data: ausentes },
     { data: ventanillas },
     { data: anuncios },
-    { data: config },
     { data: serviciosVentanillas },
   ] = await Promise.all([
       supabase
@@ -55,7 +65,7 @@ export default async function DisplayPage({
         .eq("estado", "FINALIZADO")
         .not("llamado_at", "is", null)
         .order("llamado_at", { ascending: false })
-        .limit(HISTORIAL_TOTAL),
+        .limit(historialTotal),
       supabase
         .from("v_turnos_publicos")
         .select("*")
@@ -71,12 +81,6 @@ export default async function DisplayPage({
         .eq("sucursal_id", sucursalRow.id)
         .eq("activo", true)
         .order("orden"),
-      supabase
-        .from("configuracion")
-        .select("valor")
-        .eq("sucursal_id", sucursalRow.id)
-        .eq("clave", "mensaje_pantalla")
-        .maybeSingle(),
       supabase
         .from("ventanilla_servicios")
         .select("servicio_id, ventanillas!inner(nombre, activa, sucursal_id)")
@@ -102,7 +106,9 @@ export default async function DisplayPage({
       ventanillasIniciales={ventanillas ?? []}
       ventanillasPorServicio={ventanillasPorServicio}
       anuncios={anuncios ?? []}
-      mensajePantalla={config?.valor ?? ""}
+      mensajePantalla={configMapa.get("mensaje_pantalla") ?? ""}
+      historialTotal={historialTotal}
+      destelloSegundos={destelloSegundos}
     />
   );
 }

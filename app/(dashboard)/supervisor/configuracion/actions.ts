@@ -9,9 +9,12 @@ export type AccionResultado = { ok: true } | { ok: false; error: string };
 
 const CLAVES = {
   timeoutAusenteSegundos: "timeout_ausente_segundos",
+  rellamadoAutomaticoSegundos: "rellamado_automatico_segundos",
   limitePausaMinutos: "limite_pausa_minutos",
   ratioPreferencial: "ratio_preferencial",
   minutosEscalacionUrgente: "minutos_escalacion_urgente",
+  turnosRecientesCantidad: "turnos_recientes_cantidad",
+  destelloLlamadoSegundos: "destello_llamado_segundos",
   mensajePantalla: "mensaje_pantalla",
 } as const;
 
