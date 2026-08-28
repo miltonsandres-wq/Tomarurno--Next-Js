@@ -315,15 +315,11 @@ export function DisplayClient({
       </header>
 
       <div className="flex flex-1 flex-col lg:flex-row">
-        <main className="flex flex-1 flex-col items-center justify-center gap-12 px-10 py-8">
+        <main className="flex flex-1 flex-col items-center justify-center gap-6 px-10 py-6">
           {activosLista.length === 0 ? (
             <p className="text-3xl text-slate-400">Esperando el próximo llamado</p>
           ) : (
-            <div className="flex w-full max-w-6xl flex-col gap-3">
-              <div className="flex items-center justify-between px-8 text-sm font-semibold tracking-wide text-slate-400 uppercase">
-                <span>Turno</span>
-                <span>Ventanilla</span>
-              </div>
+            <div className="flex w-full max-w-2xl flex-col gap-2">
               <AnimatePresence>
                 {activosLista.map((t) => {
                   const llamando = t.estado === "LLAMANDO";
@@ -331,12 +327,12 @@ export function DisplayClient({
                     <motion.div
                       key={t.ventanilla_id}
                       layout
-                      initial={{ opacity: 0, y: -24 }}
+                      initial={{ opacity: 0, y: -16 }}
                       animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 24 }}
-                      transition={{ duration: 0.4 }}
-                      className={`flex items-center justify-between overflow-hidden rounded-2xl px-8 shadow-lg ${
-                        llamando ? "py-7" : "py-5 border"
+                      exit={{ opacity: 0, y: 16 }}
+                      transition={{ duration: 0.35 }}
+                      className={`flex flex-col items-center justify-center overflow-hidden rounded-xl px-4 py-3 text-center shadow ${
+                        llamando ? "" : "border"
                       }`}
                       style={
                         llamando
@@ -344,18 +340,10 @@ export function DisplayClient({
                           : { backgroundColor: "#ffffff", color: AZUL, borderColor: "#e2e8f0" }
                       }
                     >
-                      <div className="flex items-center gap-6">
-                        <span
-                          className="text-xs font-semibold tracking-widest uppercase opacity-80"
-                          style={{ writingMode: "vertical-rl" }}
-                        >
-                          {llamando ? "Llamando" : "Atendiendo"}
-                        </span>
-                        <p className={`font-bold tabular-nums ${llamando ? "text-7xl" : "text-4xl"}`}>
-                          {t.codigo_ticket}
-                        </p>
-                      </div>
-                      <p className={`font-semibold ${llamando ? "text-3xl" : "text-xl opacity-80"}`}>
+                      <p className={`font-bold tabular-nums ${llamando ? "text-4xl" : "text-2xl"}`}>
+                        {t.codigo_ticket}
+                      </p>
+                      <p className={`mt-1 font-medium ${llamando ? "text-base" : "text-sm opacity-80"}`}>
                         Ventanilla {t.ventanilla_nombre ?? "—"}
                       </p>
                     </motion.div>
@@ -366,11 +354,11 @@ export function DisplayClient({
           )}
 
           {colaLista.length > 0 && (
-            <div className="w-full max-w-6xl">
-              <p className="mb-2 text-sm font-medium text-slate-400">
+            <div className="w-full max-w-2xl">
+              <p className="mb-1 text-xs font-medium text-slate-400">
                 En cola ({colaLista.length})
               </p>
-              <div className="flex flex-col gap-2 rounded-xl bg-white p-3 shadow-sm">
+              <div className="flex flex-col gap-1.5 rounded-lg bg-white p-2 shadow-sm">
                 <AnimatePresence initial={false}>
                   {colaLista.map((t) => {
                     const urgente = t.prioridad === "URGENTE";
@@ -379,21 +367,21 @@ export function DisplayClient({
                       <motion.div
                         key={t.id}
                         layout
-                        initial={{ opacity: 0, y: -12 }}
+                        initial={{ opacity: 0, y: -8 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 12 }}
+                        exit={{ opacity: 0, y: 8 }}
                         transition={{ duration: 0.25 }}
-                        className={`flex items-center justify-between rounded-lg border px-5 py-3 ${
+                        className={`flex items-center justify-between rounded-md border px-3 py-1.5 ${
                           urgente ? "border-red-200 bg-red-50" : "border-slate-100 bg-slate-50"
                         }`}
                       >
                         <span
-                          className={`text-2xl font-bold tabular-nums ${urgente ? "text-red-600" : ""}`}
+                          className={`text-base font-bold tabular-nums ${urgente ? "text-red-600" : ""}`}
                           style={urgente ? undefined : { color: AZUL }}
                         >
                           {t.codigo_ticket}
                         </span>
-                        <span className="text-sm font-medium text-slate-500">
+                        <span className="text-xs font-medium text-slate-500">
                           {ventanillasDestino.length > 0
                             ? `→ ${ventanillasDestino.map((v: string) => `Ventanilla ${v}`).join(" · ")}`
                             : "Sin ventanilla asignada"}
@@ -407,9 +395,9 @@ export function DisplayClient({
           )}
 
           {historial.length > 0 && (
-            <div className="w-full max-w-6xl">
-              <p className="mb-2 text-sm font-medium text-slate-400">Últimos llamados</p>
-              <div className="grid grid-cols-3 gap-4 rounded-xl bg-white p-5 shadow-sm lg:grid-cols-6">
+            <div className="w-full max-w-2xl">
+              <p className="mb-1 text-xs font-medium text-slate-400">Últimos llamados</p>
+              <div className="grid grid-cols-3 gap-2 rounded-lg bg-white p-2 shadow-sm lg:grid-cols-6">
                 <AnimatePresence initial={false}>
                   {historial.map((t) => (
                     <motion.div
@@ -419,12 +407,12 @@ export function DisplayClient({
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.9 }}
                       transition={{ duration: 0.25 }}
-                      className="flex flex-col items-center justify-center gap-1 rounded-lg bg-slate-50 px-4 py-4 text-center"
+                      className="flex flex-col items-center justify-center gap-0.5 rounded-md bg-slate-50 px-2 py-1.5 text-center"
                     >
-                      <span className="text-3xl font-bold tabular-nums" style={{ color: AZUL }}>
+                      <span className="text-lg font-bold tabular-nums" style={{ color: AZUL }}>
                         {t.codigo_ticket}
                       </span>
-                      <span className="text-xs text-slate-500">
+                      <span className="text-[11px] text-slate-500">
                         Ventanilla {t.ventanilla_nombre ?? "—"}
                       </span>
                     </motion.div>
