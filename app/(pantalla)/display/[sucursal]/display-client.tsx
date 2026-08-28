@@ -110,6 +110,7 @@ export function DisplayClient({
   colaInicial,
   historialInicial,
   ventanillasIniciales,
+  ventanillasPorServicio,
   anuncios,
   mensajePantalla,
 }: {
@@ -119,6 +120,7 @@ export function DisplayClient({
   colaInicial: TurnoPublico[];
   historialInicial: TurnoPublico[];
   ventanillasIniciales: { id: string; nombre: string }[];
+  ventanillasPorServicio: Record<string, string[]>;
   anuncios: Anuncio[];
   mensajePantalla: string;
 }) {
@@ -368,25 +370,35 @@ export function DisplayClient({
               <p className="mb-2 text-sm font-medium text-slate-400">
                 En cola ({colaLista.length})
               </p>
-              <div className="flex flex-wrap gap-3 rounded-xl bg-white p-5 shadow-sm">
+              <div className="flex flex-col gap-2 rounded-xl bg-white p-3 shadow-sm">
                 <AnimatePresence initial={false}>
                   {colaLista.map((t) => {
                     const urgente = t.prioridad === "URGENTE";
+                    const ventanillasDestino = ventanillasPorServicio[t.servicio_id] ?? [];
                     return (
-                      <motion.span
+                      <motion.div
                         key={t.id}
                         layout
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
+                        initial={{ opacity: 0, y: -12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 12 }}
                         transition={{ duration: 0.25 }}
-                        className={`rounded-full border px-5 py-2 text-xl font-bold tabular-nums ${
-                          urgente ? "border-red-300 bg-red-50 text-red-600" : "border-slate-200 bg-slate-50"
+                        className={`flex items-center justify-between rounded-lg border px-5 py-3 ${
+                          urgente ? "border-red-200 bg-red-50" : "border-slate-100 bg-slate-50"
                         }`}
-                        style={urgente ? undefined : { color: AZUL }}
                       >
-                        {t.codigo_ticket}
-                      </motion.span>
+                        <span
+                          className={`text-2xl font-bold tabular-nums ${urgente ? "text-red-600" : ""}`}
+                          style={urgente ? undefined : { color: AZUL }}
+                        >
+                          {t.codigo_ticket}
+                        </span>
+                        <span className="text-sm font-medium text-slate-500">
+                          {ventanillasDestino.length > 0
+                            ? `→ ${ventanillasDestino.map((v) => `Ventanilla ${v}`).join(" · ")}`
+                            : "Sin ventanilla asignada"}
+                        </span>
+                      </motion.div>
                     );
                   })}
                 </AnimatePresence>

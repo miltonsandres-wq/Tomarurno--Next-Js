@@ -26,8 +26,15 @@ export default async function DisplayPage({
     );
   }
 
-  const [{ data: activos }, { data: cola }, { data: historial }, { data: ventanillas }, { data: anuncios }, { data: config }] =
-    await Promise.all([
+  const [
+    { data: activos },
+    { data: cola },
+    { data: historial },
+    { data: ventanillas },
+    { data: anuncios },
+    { data: config },
+    { data: serviciosVentanillas },
+  ] = await Promise.all([
       supabase
         .from("v_turnos_publicos")
         .select("*")
@@ -60,7 +67,19 @@ export default async function DisplayPage({
         .eq("sucursal_id", sucursalRow.id)
         .eq("clave", "mensaje_pantalla")
         .maybeSingle(),
+      supabase
+        .from("ventanilla_servicios")
+        .select("servicio_id, ventanillas!inner(nombre, activa, sucursal_id)")
+        .eq("ventanillas.sucursal_id", sucursalRow.id)
+        .eq("ventanillas.activa", true),
     ]);
+
+  const ventanillasPorServicio: Record<string, string[]> = {};
+  for (const row of serviciosVentanillas ?? []) {
+    const nombre = (row.ventanillas as unknown as { nombre: string } | null)?.nombre;
+    if (!nombre) continue;
+    (ventanillasPorServicio[row.servicio_id] ??= []).push(nombre);
+  }
 
   return (
     <DisplayClient
@@ -70,6 +89,7 @@ export default async function DisplayPage({
       colaInicial={cola ?? []}
       historialInicial={historial ?? []}
       ventanillasIniciales={ventanillas ?? []}
+      ventanillasPorServicio={ventanillasPorServicio}
       anuncios={anuncios ?? []}
       mensajePantalla={config?.valor ?? ""}
     />
