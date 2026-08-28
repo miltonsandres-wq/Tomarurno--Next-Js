@@ -43,6 +43,7 @@ export function MonitoreoClient({
   umbralColaLarga,
   umbralEsperaMinutos,
   umbralAusentes,
+  agentesPorVentanilla,
 }: {
   sucursalId: string;
   ventanillas: Ventanilla[];
@@ -52,6 +53,7 @@ export function MonitoreoClient({
   umbralColaLarga: number;
   umbralEsperaMinutos: number;
   umbralAusentes: number;
+  agentesPorVentanilla: Record<string, string[]>;
 }) {
   const [turnos, setTurnos] = useState<TurnoRow[]>(inicial);
   const [conectado, setConectado] = useState(true);
@@ -239,6 +241,23 @@ export function MonitoreoClient({
           {ventanillas.map((v) => {
             const actual = actualPorVentanilla.get(v.id);
             const enUso = v.activa && !!actual;
+            const asignados = agentesPorVentanilla[v.id] ?? [];
+            const sinStaff = v.activa && asignados.length === 0;
+
+            let textoAgente: string;
+            if (actual?.agente_id) {
+              // Alguien está llamando/atendiendo ahora mismo en esta ventanilla.
+              textoAgente = nombreAgente.get(actual.agente_id) ?? "—";
+            } else if (sinStaff) {
+              // Ningún agente puede operarla -- distinto de "disponible pero
+              // sin nadie llamando ahora", esto sí es un hueco de personal.
+              textoAgente = "Sin agente asignado";
+            } else {
+              // Tiene agente(s) asignado(s), simplemente nadie está siendo
+              // atendido en este instante.
+              textoAgente = `Asignada a ${asignados.join(", ")}`;
+            }
+
             return (
               <div
                 key={v.id}
@@ -246,6 +265,7 @@ export function MonitoreoClient({
                   "rounded-xl border bg-card p-4 shadow-sm transition-colors",
                   !v.activa && "opacity-60",
                   enUso && "border-l-4 border-l-primary",
+                  claseFilaAlerta(sinStaff),
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -255,9 +275,7 @@ export function MonitoreoClient({
                   </Badge>
                 </div>
                 <p className="mt-3 font-mono text-2xl font-semibold tabular-nums">{actual?.codigo_ticket ?? "—"}</p>
-                <p className="text-sm text-muted-foreground">
-                  {actual?.agente_id ? (nombreAgente.get(actual.agente_id) ?? "—") : "Sin agente"}
-                </p>
+                <p className={cn("text-sm text-muted-foreground", sinStaff && "text-destructive")}>{textoAgente}</p>
               </div>
             );
           })}
