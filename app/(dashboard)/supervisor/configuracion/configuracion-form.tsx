@@ -20,6 +20,8 @@ export function ConfiguracionForm({
     minutosEscalacionUrgente: number;
     turnosRecientesCantidad: number;
     destelloLlamadoSegundos: number;
+    umbralColaLarga: number;
+    umbralAusentesAlerta: number;
     mensajePantalla: string;
   };
 }) {
@@ -125,6 +127,32 @@ export function ConfiguracionForm({
             max={60}
             value={valores.destelloLlamadoSegundos}
             onChange={(e) => setValores((v) => ({ ...v, destelloLlamadoSegundos: Number(e.target.value) }))}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="colaLarga">Alerta de cola larga (turnos en espera)</Label>
+          <Input
+            id="colaLarga"
+            type="number"
+            min={1}
+            max={200}
+            value={valores.umbralColaLarga}
+            onChange={(e) => setValores((v) => ({ ...v, umbralColaLarga: Number(e.target.value) }))}
+          />
+          <p className="text-xs text-muted-foreground">
+            El monitoreo en vivo resalta la tarjeta de En espera cuando la supera.
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="ausentesAlerta">Alerta de ausentes del día (cantidad)</Label>
+          <Input
+            id="ausentesAlerta"
+            type="number"
+            min={1}
+            max={100}
+            value={valores.umbralAusentesAlerta}
+            onChange={(e) => setValores((v) => ({ ...v, umbralAusentesAlerta: Number(e.target.value) }))}
           />
         </div>
 

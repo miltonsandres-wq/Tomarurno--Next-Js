@@ -11,6 +11,8 @@ const DEFAULTS = {
   minutos_escalacion_urgente: 15,
   turnos_recientes_cantidad: 5,
   destello_llamado_segundos: 10,
+  umbral_cola_larga: 15,
+  umbral_ausentes_alerta: 5,
   mensaje_pantalla: "Bienvenido. Gracias por su visita.",
 };
 
@@ -52,6 +54,8 @@ export default async function ConfiguracionPage() {
           destelloLlamadoSegundos: Number(
             mapa.get("destello_llamado_segundos") ?? DEFAULTS.destello_llamado_segundos,
           ),
+          umbralColaLarga: Number(mapa.get("umbral_cola_larga") ?? DEFAULTS.umbral_cola_larga),
+          umbralAusentesAlerta: Number(mapa.get("umbral_ausentes_alerta") ?? DEFAULTS.umbral_ausentes_alerta),
           mensajePantalla: mapa.get("mensaje_pantalla") ?? DEFAULTS.mensaje_pantalla,
         }}
       />

@@ -15,6 +15,8 @@ const CLAVES = {
   minutosEscalacionUrgente: "minutos_escalacion_urgente",
   turnosRecientesCantidad: "turnos_recientes_cantidad",
   destelloLlamadoSegundos: "destello_llamado_segundos",
+  umbralColaLarga: "umbral_cola_larga",
+  umbralAusentesAlerta: "umbral_ausentes_alerta",
   mensajePantalla: "mensaje_pantalla",
 } as const;
 

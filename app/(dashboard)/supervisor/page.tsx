@@ -14,16 +14,24 @@ export default async function SupervisorMonitoreoPage() {
   }
 
   const supabase = await createClient();
-  const [{ data: ventanillas }, { data: servicios }, { data: agentes }, { data: turnos }] = await Promise.all([
-    supabase.from("ventanillas").select("id, nombre, activa").eq("sucursal_id", perfil.sucursal_id).order("nombre"),
-    supabase.from("servicios").select("id, nombre").eq("sucursal_id", perfil.sucursal_id).eq("activo", true).order("nombre"),
-    supabase.from("perfiles").select("id, nombre").eq("sucursal_id", perfil.sucursal_id).eq("rol", "agente"),
-    supabase
-      .from("turnos")
-      .select("*")
-      .eq("sucursal_id", perfil.sucursal_id)
-      .in("estado", ESTADOS_VIVOS),
-  ]);
+  const [{ data: ventanillas }, { data: servicios }, { data: agentes }, { data: turnos }, { data: configRows }] =
+    await Promise.all([
+      supabase.from("ventanillas").select("id, nombre, activa").eq("sucursal_id", perfil.sucursal_id).order("nombre"),
+      supabase.from("servicios").select("id, nombre").eq("sucursal_id", perfil.sucursal_id).eq("activo", true).order("nombre"),
+      supabase.from("perfiles").select("id, nombre").eq("sucursal_id", perfil.sucursal_id).eq("rol", "agente"),
+      supabase
+        .from("turnos")
+        .select("*")
+        .eq("sucursal_id", perfil.sucursal_id)
+        .in("estado", ESTADOS_VIVOS),
+      supabase
+        .from("configuracion")
+        .select("clave, valor")
+        .eq("sucursal_id", perfil.sucursal_id)
+        .in("clave", ["umbral_cola_larga", "minutos_escalacion_urgente", "umbral_ausentes_alerta"]),
+    ]);
+
+  const configMapa = new Map((configRows ?? []).map((c) => [c.clave, c.valor]));
 
   return (
     <MonitoreoClient
@@ -32,6 +40,9 @@ export default async function SupervisorMonitoreoPage() {
       servicios={servicios ?? []}
       agentes={agentes ?? []}
       inicial={turnos ?? []}
+      umbralColaLarga={Number(configMapa.get("umbral_cola_larga") ?? 15)}
+      umbralEsperaMinutos={Number(configMapa.get("minutos_escalacion_urgente") ?? 15)}
+      umbralAusentes={Number(configMapa.get("umbral_ausentes_alerta") ?? 5)}
     />
   );
 }

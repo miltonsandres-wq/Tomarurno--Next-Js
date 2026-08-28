@@ -8,6 +8,8 @@ export const configuracionSchema = z.object({
   minutosEscalacionUrgente: z.coerce.number().int().min(1).max(120),
   turnosRecientesCantidad: z.coerce.number().int().min(1).max(20),
   destelloLlamadoSegundos: z.coerce.number().int().min(3).max(60),
+  umbralColaLarga: z.coerce.number().int().min(1).max(200),
+  umbralAusentesAlerta: z.coerce.number().int().min(1).max(100),
   mensajePantalla: z.string().max(300),
 });
 

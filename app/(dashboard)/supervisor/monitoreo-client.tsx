@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Armchair, Clock, Hourglass, PhoneCall, UserX } from "lucide-react";
+import { AlertTriangle, Armchair, Clock, Hourglass, PhoneCall, TimerReset } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatTile } from "@/components/dashboard/stat-tile";
 import { EmptyState } from "@/components/dashboard/empty-state";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { GraficaColaPorServicio, type DatoCola } from "./cola-grafica";
+import { claseBadgeAlerta, claseFilaAlerta, superaUmbral, tonoAlerta } from "@/lib/alertas-monitoreo";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/types/database";
 
@@ -18,7 +20,7 @@ type Servicio = { id: string; nombre: string };
 type Nombres = { id: string; nombre: string };
 
 const RECONEXION_MS = 3000;
-const ACTUALIZACION_RELOJ_MS = 30000;
+const ACTUALIZACION_RELOJ_MS = 15000;
 const ESTADOS_VIVOS: EstadoTurno[] = ["ESPERANDO", "LLAMANDO", "EN_ATENCION", "AUSENTE"];
 
 const ETIQUETA_ESTADO: Record<string, string> = {
@@ -38,12 +40,18 @@ export function MonitoreoClient({
   servicios,
   agentes,
   inicial,
+  umbralColaLarga,
+  umbralEsperaMinutos,
+  umbralAusentes,
 }: {
   sucursalId: string;
   ventanillas: Ventanilla[];
   servicios: Servicio[];
   agentes: Nombres[];
   inicial: TurnoRow[];
+  umbralColaLarga: number;
+  umbralEsperaMinutos: number;
+  umbralAusentes: number;
 }) {
   const [turnos, setTurnos] = useState<TurnoRow[]>(inicial);
   const [conectado, setConectado] = useState(true);
@@ -107,10 +115,13 @@ export function MonitoreoClient({
 
   useEffect(() => {
     setAhora(Date.now());
+    // Cada 15s: el KPI que dispara acción (mayor espera actual) necesita
+    // refrescarse seguido, no cada 30s como el resto de este panel.
     const id = setInterval(() => setAhora(Date.now()), ACTUALIZACION_RELOJ_MS);
     return () => clearInterval(id);
   }, []);
 
+  // Ventanilla -> turno que está llamando/atendiendo ahora mismo en ella.
   const actualPorVentanilla = new Map<string, TurnoRow>();
   for (const t of turnos) {
     if (!t.ventanilla_id) continue;
@@ -119,6 +130,17 @@ export function MonitoreoClient({
     if (!existente || (t.llamado_at ?? "") > (existente.llamado_at ?? "")) {
       actualPorVentanilla.set(t.ventanilla_id, t);
     }
+  }
+
+  // Cuántas ventanillas están atendiendo cada servicio ahora mismo (no
+  // cuántas están *configuradas* para atenderlo -- eso es un dato estático,
+  // esto es la foto en vivo).
+  const ventanillasAtendiendoPorServicio = new Map<string, number>();
+  for (const t of actualPorVentanilla.values()) {
+    ventanillasAtendiendoPorServicio.set(
+      t.servicio_id,
+      (ventanillasAtendiendoPorServicio.get(t.servicio_id) ?? 0) + 1,
+    );
   }
 
   const esperandoPorServicio = new Map<string, { total: number; urgentes: number }>();
@@ -137,14 +159,35 @@ export function MonitoreoClient({
     return { nombre: s.nombre, normal: datos.total - datos.urgentes, urgente: datos.urgentes };
   });
 
+  const filasServicio = servicios.map((s) => {
+    const esperandoServicio = esperandoPorServicio.get(s.id)?.total ?? 0;
+    const ventanillasServicio = ventanillasAtendiendoPorServicio.get(s.id) ?? 0;
+    return {
+      servicio: s,
+      esperando: esperandoServicio,
+      ventanillasAtendiendo: ventanillasServicio,
+      cuelloDeBotella: esperandoServicio > 0 && ventanillasServicio === 0,
+    };
+  });
+
   const totalEnAtencion = turnos.filter((t) => t.estado === "LLAMANDO" || t.estado === "EN_ATENCION").length;
-  const totalUrgentes = esperando.filter((t) => t.prioridad === "URGENTE").length;
   const totalAusentes = turnos.filter((t) => t.estado === "AUSENTE").length;
-  const ventanillasActivas = ventanillas.filter((v) => v.activa).length;
+  const ventanillasAtendiendoTotal = actualPorVentanilla.size;
+
   const esperaPromedioMs =
     ahora !== null && esperando.length > 0
       ? esperando.reduce((acc, t) => acc + (ahora - new Date(t.created_at).getTime()), 0) / esperando.length
       : null;
+
+  const mayorEsperaMs =
+    ahora !== null && esperando.length > 0
+      ? Math.max(...esperando.map((t) => ahora - new Date(t.created_at).getTime()))
+      : null;
+  const mayorEsperaMinutos = mayorEsperaMs !== null ? mayorEsperaMs / 60000 : null;
+
+  const alertaColaLarga = superaUmbral(esperando.length, umbralColaLarga);
+  const alertaMayorEspera = mayorEsperaMinutos !== null && superaUmbral(mayorEsperaMinutos, umbralEsperaMinutos);
+  const alertaAusentes = superaUmbral(totalAusentes, umbralAusentes);
 
   return (
     <div className="space-y-6 p-4 sm:p-6">
@@ -153,6 +196,12 @@ export function MonitoreoClient({
         description="Estado en tiempo real de ventanillas y colas de esta sucursal."
         actions={
           <>
+            {alertaAusentes && (
+              <Badge variant="outline" className={cn("gap-1.5", claseBadgeAlerta(true))}>
+                <AlertTriangle className="h-3 w-3" />
+                {totalAusentes} ausentes hoy
+              </Badge>
+            )}
             {!conectado && <Badge variant="destructive">Reconectando…</Badge>}
             {conectado && (
               <Badge variant="outline" className="gap-1.5 text-muted-foreground">
@@ -164,28 +213,24 @@ export function MonitoreoClient({
         }
       />
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        <StatTile etiqueta="En espera" valor={String(esperando.length)} icono={Hourglass} />
-        <StatTile
-          etiqueta="Urgentes"
-          valor={String(totalUrgentes)}
-          icono={Clock}
-          tono={totalUrgentes > 0 ? "destructive" : undefined}
-        />
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="col-span-2 sm:col-span-1">
+          <StatTile etiqueta="En espera" valor={String(esperando.length)} icono={Hourglass} destacado tono={tonoAlerta(alertaColaLarga)} />
+        </div>
         <StatTile etiqueta="En atención" valor={String(totalEnAtencion)} icono={PhoneCall} />
         <StatTile
-          etiqueta="Ausentes"
-          valor={String(totalAusentes)}
-          icono={UserX}
-          tono={totalAusentes > 0 ? "destructive" : undefined}
-        />
-        <StatTile
-          etiqueta="Ventanillas activas"
-          valor={`${ventanillasActivas}/${ventanillas.length}`}
-          icono={Armchair}
-          meter={ventanillas.length > 0 ? ventanillasActivas / ventanillas.length : 0}
+          etiqueta="Mayor espera actual"
+          valor={formatearMinutos(mayorEsperaMs)}
+          icono={AlertTriangle}
+          tono={tonoAlerta(alertaMayorEspera)}
         />
         <StatTile etiqueta="Espera promedio" valor={formatearMinutos(esperaPromedioMs)} icono={Clock} />
+        <StatTile
+          etiqueta="Ventanillas atendiendo"
+          valor={`${ventanillasAtendiendoTotal}/${ventanillas.length}`}
+          icono={Armchair}
+          meter={ventanillas.length > 0 ? ventanillasAtendiendoTotal / ventanillas.length : 0}
+        />
       </div>
 
       <div>
@@ -225,6 +270,38 @@ export function MonitoreoClient({
       <div className="rounded-xl border bg-card p-4 shadow-sm">
         <h2 className="mb-2 text-sm font-medium text-muted-foreground">Cola por servicio</h2>
         <GraficaColaPorServicio datos={datosCola} />
+
+        {servicios.length > 0 && (
+          <Table className="mt-4">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Servicio</TableHead>
+                <TableHead className="text-right">En espera</TableHead>
+                <TableHead className="text-right">Ventanillas atendiendo</TableHead>
+                <TableHead className="text-right">Estado</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filasServicio.map((f) => (
+                <TableRow key={f.servicio.id} className={claseFilaAlerta(f.cuelloDeBotella)}>
+                  <TableCell className="font-medium">{f.servicio.nombre}</TableCell>
+                  <TableCell className="text-right tabular-nums">{f.esperando}</TableCell>
+                  <TableCell className="text-right tabular-nums">{f.ventanillasAtendiendo}</TableCell>
+                  <TableCell className="text-right">
+                    {f.cuelloDeBotella ? (
+                      <Badge variant="outline" className={cn("gap-1", claseBadgeAlerta(true))}>
+                        <TimerReset className="h-3 w-3" />
+                        Sin atender
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">OK</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </div>
     </div>
   );
